@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SentiScan – CSV Sentiment Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0b0f1a;--card:#111827;--card2:#1a2035;
+  --pos:#10b981;--neg:#ef4444;--neu:#6366f1;
+  --accent:#6366f1;--accent2:#8b5cf6;
+  --text:#f1f5f9;--muted:#64748b;--border:#1e2d45;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* HERO */
+.hero{text-align:center;padding:60px 20px 30px;position:relative}
+.hero::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:600px;height:400px;
+  background:radial-gradient(ellipse,rgba(99,102,241,.18) 0%,transparent 70%);pointer-events:none}
+.badge{display:inline-flex;align-items:center;gap:8px;background:rgba(99,102,241,.12);
+  border:1px solid rgba(99,102,241,.3);border-radius:50px;padding:6px 16px;font-size:12px;
+  color:var(--accent2);font-weight:600;letter-spacing:.5px;margin-bottom:20px}
+.badge span{width:7px;height:7px;border-radius:50%;background:var(--accent2);
+  animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.15;
+  background:linear-gradient(135deg,#f1f5f9 30%,#818cf8);-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;background-clip:text;margin-bottom:12px}
+.subtitle{color:var(--muted);font-size:1rem;max-width:480px;margin:0 auto}
+
+/* UPLOAD CARD */
+.container{max-width:900px;margin:0 auto;padding:0 20px 60px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px;margin-bottom:24px}
+.drop-zone{border:2px dashed var(--border);border-radius:14px;padding:48px 20px;text-align:center;
+  cursor:pointer;transition:.3s;position:relative;background:rgba(99,102,241,.03)}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:rgba(99,102,241,.08)}
+.drop-icon{font-size:42px;margin-bottom:12px;display:block}
+.drop-label{font-size:1rem;color:var(--text);font-weight:600}
+.drop-sub{font-size:.83rem;color:var(--muted);margin-top:6px}
+.file-pill{display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,.12);
+  border:1px solid rgba(16,185,129,.3);color:var(--pos);border-radius:50px;
+  padding:6px 14px;font-size:.83rem;font-weight:600;margin-top:12px}
+input[type=file]{display:none}
+
+.field-row{display:flex;gap:12px;align-items:flex-end;margin-top:20px}
+.field-row label{font-size:.82rem;color:var(--muted);font-weight:500;margin-bottom:5px;display:block}
+.field-row input{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:10px;
+  padding:10px 14px;color:var(--text);font-size:.9rem;outline:none;transition:.3s;font-family:inherit}
+.field-row input:focus{border-color:var(--accent)}
+
+.btn{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;
+  border:none;border-radius:12px;padding:12px 28px;font-size:.95rem;font-weight:700;
+  cursor:pointer;transition:.25s;font-family:inherit;white-space:nowrap}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(99,102,241,.4)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+/* RESULTS */
+.results{display:none}
+.dist-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+.dist-card{border-radius:16px;padding:24px;text-align:center;position:relative;overflow:hidden}
+.dist-card.pos{background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.05));border:1px solid rgba(16,185,129,.25)}
+.dist-card.neg{background:linear-gradient(135deg,rgba(239,68,68,.15),rgba(239,68,68,.05));border:1px solid rgba(239,68,68,.25)}
+.dist-card.neu{background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(99,102,241,.05));border:1px solid rgba(99,102,241,.25)}
+.dist-pct{font-size:2.4rem;font-weight:800;line-height:1}
+.dist-card.pos .dist-pct{color:var(--pos)}
+.dist-card.neg .dist-pct{color:var(--neg)}
+.dist-card.neu .dist-pct{color:var(--neu)}
+.dist-label{font-size:.8rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;
+  color:var(--muted);margin-top:6px}
+.dist-count{font-size:.78rem;color:var(--muted);margin-top:4px}
+.dist-bar-wrap{height:4px;background:rgba(255,255,255,.07);border-radius:4px;margin-top:14px;overflow:hidden}
+.dist-bar{height:100%;border-radius:4px;width:0;transition:width 1s ease}
+.dist-card.pos .dist-bar{background:var(--pos)}
+.dist-card.neg .dist-bar{background:var(--neg)}
+.dist-card.neu .dist-bar{background:var(--neu)}
+
+/* CHART */
+.chart-wrap{display:flex;align-items:center;justify-content:center;padding:20px 0}
+svg#donut{filter:drop-shadow(0 0 20px rgba(99,102,241,.2))}
+.json-box{background:#0d1117;border:1px solid var(--border);border-radius:12px;padding:20px;
+  font-family:'Courier New',monospace;font-size:.9rem;line-height:1.7;position:relative;overflow:auto}
+.json-key{color:#79c0ff}.json-num{color:#f97316}
+.copy-btn{position:absolute;top:12px;right:12px;background:var(--card2);border:1px solid var(--border);
+  color:var(--muted);border-radius:8px;padding:5px 12px;font-size:.78rem;cursor:pointer;
+  font-family:inherit;transition:.2s}
+.copy-btn:hover{color:var(--text);border-color:var(--accent)}
+
+/* TABLE */
+.table-wrap{max-height:320px;overflow-y:auto;border-radius:12px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+thead th{background:var(--card2);padding:10px 14px;text-align:left;font-weight:600;
+  color:var(--muted);font-size:.78rem;letter-spacing:.5px;text-transform:uppercase;
+  position:sticky;top:0}
+tbody tr{border-top:1px solid var(--border);transition:.15s}
+tbody tr:hover{background:rgba(255,255,255,.03)}
+td{padding:10px 14px;vertical-align:top}
+.td-idx{color:var(--muted);width:50px}
+.td-text{max-width:400px;word-break:break-word;line-height:1.5}
+.chip{display:inline-block;padding:3px 10px;border-radius:50px;font-size:.75rem;font-weight:700}
+.chip.positive{background:rgba(16,185,129,.15);color:var(--pos)}
+.chip.negative{background:rgba(239,68,68,.15);color:var(--neg)}
+.chip.neutral{background:rgba(99,102,241,.15);color:var(--neu)}
+
+/* LOADER */
+.loader{display:none;text-align:center;padding:30px}
+.spinner{width:40px;height:40px;border:3px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* SECTION TITLE */
+.section-title{font-size:.78rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:14px}
+.section-gap{margin-top:24px}
+
+@media(max-width:600px){.dist-grid{grid-template-columns:1fr}.field-row{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="badge"><span></span>AI Sentiment Engine</div>
+  <h1>SentiScan</h1>
+  <p class="subtitle">Upload any CSV file and instantly analyze sentiment distribution across all rows.</p>
+</div>
+
+<div class="container">
+  <!-- Upload Card -->
+  <div class="card">
+    <div class="drop-zone" id="dropZone">
+      <span class="drop-icon">📂</span>
+      <div class="drop-label">Drop your CSV here or click to browse</div>
+      <div class="drop-sub">Supported format: .csv — any size</div>
+      <div id="filePill" style="display:none"></div>
+      <input type="file" id="fileInput" accept=".csv"/>
+    </div>
+
+    <div class="field-row">
+      <div style="flex:1">
+        <label for="colInput">Text Column Name</label>
+        <input type="text" id="colInput" value="text" placeholder="e.g. text, review, comment"/>
+      </div>
+      <button class="btn" id="analyzeBtn" onclick="runAnalysis()">Analyze →</button>
+    </div>
+  </div>
+
+  <!-- Loader -->
+  <div class="loader" id="loader">
+    <div class="spinner"></div>
+    <div style="color:var(--muted);font-size:.9rem">Analyzing sentiment…</div>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+
+    <!-- Distribution cards -->
+    <div class="section-title">Sentiment Distribution</div>
+    <div class="dist-grid">
+      <div class="dist-card pos">
+        <div class="dist-pct" id="posVal">0%</div>
+        <div class="dist-label">Positive</div>
+        <div class="dist-count" id="posCount"></div>
+        <div class="dist-bar-wrap"><div class="dist-bar" id="posBar"></div></div>
+      </div>
+      <div class="dist-card neg">
+        <div class="dist-pct" id="negVal">0%</div>
+        <div class="dist-label">Negative</div>
+        <div class="dist-count" id="negCount"></div>
+        <div class="dist-bar-wrap"><div class="dist-bar" id="negBar"></div></div>
+      </div>
+      <div class="dist-card neu">
+        <div class="dist-pct" id="neuVal">0%</div>
+        <div class="dist-label">Neutral</div>
+        <div class="dist-count" id="neuCount"></div>
+        <div class="dist-bar-wrap"><div class="dist-bar" id="neuBar"></div></div>
+      </div>
+    </div>
+
+    <!-- Donut chart -->
+    <div class="card section-gap">
+      <div class="section-title">Visual Breakdown</div>
+      <div class="chart-wrap">
+        <svg id="donut" width="220" height="220" viewBox="0 0 220 220"></svg>
+      </div>
+    </div>
+
+    <!-- JSON Output -->
+    <div class="card section-gap">
+      <div class="section-title">JSON Output</div>
+      <div class="json-box" id="jsonBox">
+        <button class="copy-btn" onclick="copyJSON()">Copy</button>
+        <pre id="jsonPre"></pre>
+      </div>
+    </div>
+
+    <!-- Row Table -->
+    <div class="card section-gap">
+      <div class="section-title">Row-by-Row Results</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Text</th><th>Score</th><th>Sentiment</th></tr></thead>
+          <tbody id="rowBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const filePill = document.getElementById('filePill');
+let selectedFile = null;
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.csv')) setFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+function setFile(f) {
+  selectedFile = f;
+  filePill.style.display = 'inline-flex';
+  filePill.className = 'file-pill';
+  filePill.innerHTML = `📄 ${f.name} <span style="color:#64748b">(${(f.size/1024).toFixed(1)} KB)</span>`;
+}
+
+async function runAnalysis() {
+  if (!selectedFile) { alert('Please select a CSV file first.'); return; }
+  const col = document.getElementById('colInput').value.trim() || 'text';
+  const btn = document.getElementById('analyzeBtn');
+
+  btn.disabled = true;
+  document.getElementById('loader').style.display = 'block';
+  document.getElementById('results').style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('csv_file', selectedFile);
+  fd.append('text_column', col);
+
+  try {
+    const res = await fetch('/analyze', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+    renderResults(data);
+  } catch(e) {
+    alert('Could not reach server. Is server.py running?');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('loader').style.display = 'none';
+  }
+}
+
+function renderResults(data) {
+  const d = data.distribution, c = data.counts, total = data.total;
+  document.getElementById('results').style.display = 'block';
+
+  // Cards
+  animateVal('posVal', d.positive);
+  animateVal('negVal', d.negative);
+  animateVal('neuVal', d.neutral);
+  document.getElementById('posCount').textContent = `${c.positive} of ${total} entries`;
+  document.getElementById('negCount').textContent = `${c.negative} of ${total} entries`;
+  document.getElementById('neuCount').textContent = `${c.neutral} of ${total} entries`;
+  setTimeout(() => {
+    document.getElementById('posBar').style.width = d.positive + '%';
+    document.getElementById('negBar').style.width = d.negative + '%';
+    document.getElementById('neuBar').style.width = d.neutral + '%';
+  }, 100);
+
+  // Donut
+  drawDonut(d.positive, d.negative, d.neutral);
+
+  // JSON
+  const json = { positive: d.positive, negative: d.negative, neutral: d.neutral };
+  document.getElementById('jsonPre').innerHTML =
+    `{\n  <span class="json-key">"positive"</span>: <span class="json-num">${d.positive}</span>,\n  <span class="json-key">"negative"</span>: <span class="json-num">${d.negative}</span>,\n  <span class="json-key">"neutral"</span>: <span class="json-num">${d.neutral}</span>\n}`;
+  window._jsonData = json;
+
+  // Table
+  const tbody = document.getElementById('rowBody');
+  tbody.innerHTML = '';
+  (data.rows || []).forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="td-idx">${r.index}</td><td class="td-text">${esc(r.text)}</td><td><span style="color:var(--muted);font-weight:600">${r.score !== undefined ? r.score : '-'}</span></td><td><span class="chip ${r.sentiment}">${r.sentiment}</span></td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function animateVal(id, target) {
+  const el = document.getElementById(id);
+  let cur = 0; const step = target / 40;
+  const iv = setInterval(() => {
+    cur = Math.min(cur + step, target);
+    el.textContent = cur.toFixed(2) + '%';
+    if (cur >= target) clearInterval(iv);
+  }, 18);
+}
+
+function drawDonut(pos, neg, neu) {
+  const svg = document.getElementById('donut');
+  svg.innerHTML = '';
+  const cx = 110, cy = 110, r = 80, stroke = 32;
+  const total = pos + neg + neu || 1;
+  const colors = ['#10b981','#ef4444','#6366f1'];
+  const vals = [pos, neg, neu];
+  const labels = ['Positive','Negative','Neutral'];
+  let offset = -90;
+
+  vals.forEach((v, i) => {
+    if (v === 0) return;
+    const pct = v / total;
+    const angle = pct * 360;
+    const circ = 2 * Math.PI * r;
+    const dash = (pct * circ).toFixed(2);
+    const gap = (circ - dash).toFixed(2);
+    const rot = offset;
+    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', r);
+    circle.setAttribute('fill','none');
+    circle.setAttribute('stroke', colors[i]);
+    circle.setAttribute('stroke-width', stroke);
+    circle.setAttribute('stroke-dasharray', `${dash} ${gap}`);
+    circle.setAttribute('stroke-dashoffset', -(rot / 360 * circ - circ/4));
+    circle.setAttribute('stroke-linecap','butt');
+    svg.appendChild(circle);
+    offset += angle;
+  });
+
+  // Center text
+  const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+  txt.setAttribute('x', cx); txt.setAttribute('y', cy - 6);
+  txt.setAttribute('text-anchor','middle'); txt.setAttribute('fill','#f1f5f9');
+  txt.setAttribute('font-size','22'); txt.setAttribute('font-weight','800');
+  txt.setAttribute('font-family','Inter,sans-serif');
+  txt.textContent = (pos >= neg && pos >= neu) ? `${pos}%` : (neg >= neu ? `${neg}%` : `${neu}%`);
+  svg.appendChild(txt);
+
+  const sub = document.createElementNS('http://www.w3.org/2000/svg','text');
+  sub.setAttribute('x', cx); sub.setAttribute('y', cy + 14);
+  sub.setAttribute('text-anchor','middle'); sub.setAttribute('fill','#64748b');
+  sub.setAttribute('font-size','11'); sub.setAttribute('font-family','Inter,sans-serif');
+  sub.textContent = (pos >= neg && pos >= neu) ? 'Positive' : (neg >= neu ? 'Negative' : 'Neutral');
+  svg.appendChild(sub);
+}
+
+function copyJSON() {
+  if (!window._jsonData) return;
+  navigator.clipboard.writeText(JSON.stringify(window._jsonData, null, 2));
+  const btn = document.querySelector('.copy-btn');
+  btn.textContent = '✓ Copied!'; btn.style.color = '#10b981';
+  setTimeout(() => { btn.textContent = 'Copy'; btn.style.color = ''; }, 2000);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
